@@ -61,7 +61,7 @@ def create_df (file_list, add_name):
 
         if add_name == MIN_STOCK_NAME:
             df.iloc[int(f), 1] = 'Артикул'
-            df.iloc[int(f), col-1] = 'Номенклатура'
+            df.iloc[int(f), col-2] = 'Номенклатура'
             df.columns = df.iloc[int(f)] # Значения из найденной строки переносим в заголовки DataFrame для простоты дальнейшего обращения
             df = df[['Артикул', 'Номенклатура', 'МО внешний']]
             df = df.iloc[3:len(df)-1, :]  # Убираем три строки с верха DF и одну снизу
@@ -86,7 +86,7 @@ def read_my_excel (file_name):
     """
     print ('Попытка загрузки файла:'+file_name)
     try:
-        df = pd.read_excel(file_name, sheet_name='TDSheet', header=None, skipfooter=0, engine='openpyxl')
+        df = pd.read_excel(file_name, header=None, skipfooter=0, engine='openpyxl')
         return (df)
     except KeyError as Error:
         print (Error)
@@ -94,7 +94,7 @@ def read_my_excel (file_name):
         if str(Error) == "\"There is no item named 'xl/sharedStrings.xml' in the archive\"":
             bug_fix (file_name)
             print('Исправлена ошибка: ', Error, f'в файле: \"{file_name}\"\n')
-            df = pd.read_excel(file_name, sheet_name='TDSheet', header=None, skipfooter=0, engine='openpyxl')
+            df = pd.read_excel(file_name, header=None, skipfooter=0, engine='openpyxl')
             return df
         else:
             print('Ошибка: >>' + str(Error) + '<<')
@@ -161,18 +161,26 @@ def df_write_xlsx(df, name_file):
     row_end_str, col_end_str = str(row_end), str(col_end)
 
     # Сбрасываем встроенный формат заголовков pandas
-    pd.io.formats.excel.ExcelFormatter.header_style = None
+    # pd.io.formats.excel.ExcelFormatter.header_style = None
+
+    # Для простоты форматирования переводим индекс колонки
+    # df.reset_index(inplace=True)
+    df = df.reset_index()
 
     # Создаём эксель и сохраняем данные
     sheet_name = 'Данные'  # Наименование вкладки для сводной таблицы
     writer = pd.ExcelWriter(name_file, engine='xlsxwriter')
     workbook = writer.book
-    df.to_excel(writer, sheet_name=sheet_name)
+    df.to_excel(writer, index=False, sheet_name=sheet_name)
     wks1 = writer.sheets[sheet_name]  # Сохраняем в переменную вкладку для форматирования
 
     # Получаем словари форматов для эксель
     header_format, con_format, border_storage_format_left, border_storage_format_right, \
     name_format, MO_format, data_format = format_custom(workbook)
+
+    # Перезаписываем заголовок таблицы с их форматированием
+    for col_num, value in enumerate(df.columns.values):
+        wks1.write(0, col_num, value, header_format)
 
     # Форматируем таблицу
     wks1.set_default_row(12)
@@ -192,7 +200,7 @@ def df_write_xlsx(df, name_file):
     wks1.autofilter(0, 0, row_end+1, col_end+1)
 
     # Сохраняем файл
-    writer.save()
+    writer.close()
     return
 
 def format_custom(workbook):
